@@ -92,6 +92,28 @@ async fn index(
     Ok(HttpResponse::Ok().body(body))
 }
 
+/// Show a cat details page, with the url pattern /cat/<id>
+async fn cat(
+    hb: web::Data<Handlebars<'_>>,
+    pool: web::Data<DbPool>,
+    cat_id: web::Path<i32>
+) -> Result<HttpResponse, Error> {
+    let connection = pool.get()
+        .expect("Can't get a DB connection from pool");
+    
+    let cat_data = web::block(move || {
+        cats.filter(id.eq(cat_id.into_inner()))
+        .first::<Cat>(&connection)
+    })
+    .await
+    .map_err(|_| HttpResponse::InternalServerError().finish()).unwrap().unwrap();
+
+    let body = hb.render("cat", &cat_data).unwrap();
+
+    Ok(HttpResponse::Ok().body(body))
+}
+
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let mut handlebars = Handlebars::new();
@@ -120,6 +142,7 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(index))
             .route("/add", web::get().to(add))
+            .route("/cat/{id}", web::get().to(cat))
     })
         .bind("127.0.0.1:8080")?
         .run()
