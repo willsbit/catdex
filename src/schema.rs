@@ -1,4 +1,3 @@
-use diesel::table;
 table! {
     cats (id) {
         id -> Int4,
