@@ -62,7 +62,7 @@ async fn add_cat_form(
         .execute(&connection)
         })
         .await
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        .map_err(|_| HttpResponse::InternalServerError().finish()).unwrap();
 
     // redirect sucess with 303 See Other status code
     Ok(HttpResponse::SeeOther()
