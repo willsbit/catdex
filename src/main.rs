@@ -41,15 +41,19 @@ async fn add_cat_form(
     pool: web::Data<DbPool>,
     mut parts: Parts,
 ) -> Result<HttpResponse, Error> {
+
     let file_path = parts
-        .files
+    .files
         .take("image")
         .pop()
         .and_then(|f| f.persist_in("./static/image").ok())
         .unwrap_or_default();
+    
 
-    let text_fields: HashMap<_, _> = 
+        let text_fields: HashMap<_, _> = 
         parts.texts.as_pairs().into_iter().collect();
+
+    println!("{:?}", &text_fields);
 
     let connection = pool.get().expect("Can't get a DB connection from pool.");
 
@@ -58,18 +62,17 @@ async fn add_cat_form(
         image_path: file_path.to_string_lossy().to_string()
     };
 
-    web::block(move || {
+    web::block(move || 
         diesel::insert_into(cats)
         .values(&new_cat)
         .execute(&connection)
-        })
-        .await
-        .map_err(|_| HttpResponse::InternalServerError().finish()).unwrap();
-
-    // redirect sucess with 303 See Other status code
-    Ok(HttpResponse::SeeOther()
-        .header(http::header::LOCATION, "/")
-        .finish())
+    )
+    .await
+    .map_err(|_| {
+        HttpResponse::InternalServerError().finish()
+    }).unwrap().unwrap();
+// https://tools.ietf.org/html/rfc7231#section-6.4.4
+Ok(HttpResponse::SeeOther().header(http::header::LOCATION, "/").finish())
 
 }
 
