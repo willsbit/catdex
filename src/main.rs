@@ -2,7 +2,7 @@
 extern crate diesel;
 
 use actix_files::Files;
-use actix_web::{http, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{http, web, App, Error, HttpResponse, HttpServer, FromRequest, ResponseError};
 use awmp::Parts;
 use std::collections::HashMap;
 use std::env;
@@ -27,6 +27,7 @@ struct IndexTemplateData {
     cats: Vec<self::models::Cat>
 }
 
+/// Render the handlebar that allows a user to add a cat
 async fn add(
     hb: web::Data<Handlebars<'_>>,
 ) -> Result<HttpResponse, Error> {
@@ -35,6 +36,7 @@ async fn add(
     Ok(HttpResponse::Ok().body(body))
 }
 
+/// POST request endpoint to add a new cat to the database
 async fn add_cat_form(
     pool: web::Data<DbPool>,
     mut parts: Parts,
@@ -71,7 +73,7 @@ async fn add_cat_form(
 
 }
 
-
+/// Main page
 async fn index(
     hb: web::Data<Handlebars<'_>>,
     pool: web::Data<DbPool>) -> Result<HttpResponse, Error> {
@@ -101,12 +103,11 @@ async fn cat(
     let connection = pool.get()
         .expect("Can't get a DB connection from pool");
     
-    let cat_data = web::block(move || {
-        cats.filter(id.eq(cat_id.into_inner()))
-        .first::<Cat>(&connection)
-    })
-    .await
-    .map_err(|_| HttpResponse::InternalServerError().finish()).unwrap().unwrap();
+    let cat_data = web::block(move || cats.filter(id.eq(cat_id.into_inner())).first::<Cat>(&connection))
+        .await
+        .map_err(|_| {
+            HttpResponse::InternalServerError().finish()
+        }).unwrap().unwrap();
 
     let body = hb.render("cat", &cat_data).unwrap();
 
@@ -143,6 +144,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(index))
             .route("/add", web::get().to(add))
             .route("/cat/{id}", web::get().to(cat))
+            .route("/add_cat_form", web::post().to(add_cat_form))
     })
         .bind("127.0.0.1:8080")?
         .run()
