@@ -35,6 +35,42 @@ async fn add(
     Ok(HttpResponse::Ok().body(body))
 }
 
+async fn add_cat_form(
+    pool: web::Data<DbPool>,
+    mut parts: Parts,
+) -> Result<HttpResponse, Error> {
+    let file_path = parts
+        .files
+        .take("image")
+        .pop()
+        .and_then(|f| f.persist_in("./static/image").ok())
+        .unwrap_or_default();
+
+    let text_fields: HashMap<_, _> = 
+        parts.texts.as_pairs().into_iter().collect();
+
+    let connection = pool.get().expect("Can't get a DB connection from pool.");
+
+    let new_cat = NewCat {
+        name: text_fields.get("name").unwrap().to_string(),
+        image_path: file_path.to_string_lossy().to_string()
+    };
+
+    web::block(move || {
+        diesel::insert_into(cats)
+        .values(&new_cat)
+        .execute(&connection)
+        })
+        .await
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    // redirect sucess with 303 See Other status code
+    Ok(HttpResponse::SeeOther()
+        .header(http::header::LOCATION, "/")
+        .finish())
+
+}
+
 
 async fn index(
     hb: web::Data<Handlebars<'_>>,
