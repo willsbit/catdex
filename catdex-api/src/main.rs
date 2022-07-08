@@ -28,15 +28,23 @@ async fn cats_endpoint(
         return Ok(HttpResponse::Ok().json(cats_data));
     }
 
+
+fn setup_database() -> DbPool {
+    let database_url = env::var("DATABASE_URL")
+            .expect("DATABASE_URL must be set");
+    let manager =
+            ConnectionManager::<PgConnection>::new(&database_url);
+    
+    r2d2::Pool::builder()
+            .build(manager)
+            .expect("Failed to create DB connection pool.")
+}
+
     #[actix_web::main]
     async fn main() -> std::io::Result<()> {
-        let database_url = env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set");
-        let manager =
-            ConnectionManager::<PgConnection>::new(&database_url);
-        let pool = r2d2::Pool::builder()
-            .build(manager)
-            .expect("Failed to create DB connection pool.");
+        
+        let pool = setup_database();
+
         println!("Listening on port 8080");
         HttpServer::new(move || {
             App::new()
@@ -54,4 +62,31 @@ async fn cats_endpoint(
             .bind("127.0.0.1:8080")?
             .run()
             .await
+    }
+
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use actix_web::{test, App};
+        use actix_rt::*;
+        
+        #[actix_rt::test]
+        async fn test_cats_endpoint_get() {
+            let pool = setup_database();
+            let mut app = test::init_service(
+                App::new().app_data(Data::new(pool.clone()))
+                    .route("/api/cats", web::get().to(cats_endpoint)
+                )
+            )
+            .await;
+
+            let req = test::TestRequest::get()
+                .uri("/api/cats")
+                .to_request();
+
+            let resp = test::call_service(&mut app, req).await;
+
+            assert!(resp.status().is_success());
+        }
     }
