@@ -13,3 +13,4 @@ serde_json = "1.0.82"
 diesel = { version = "1.4.4", features = ["postgres", "r2d2"] }
 r2d2 = "0.8.8"
 awmp = { version = "0.8", default-features = false, features = ["v4"] }
+actix-rt = "2.7.0"
